@@ -1,0 +1,15 @@
+{
+  "id": "minimum-player-gate",
+  "main": "xyz.zcraft.mc.MinimumPlayerGate",
+  "name": "Minimum Player Gate",
+  "version": "1.0.0",
+  "description": "Make your server open only when more than X players are present!",
+  "authors": [
+    "Zayrex"
+  ],
+  "dependencies": [
+    {
+      "id": "limboapi"
+    }
+  ]
+}
