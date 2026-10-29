@@ -13,7 +13,7 @@ import java.util.*;
 /**
  * Immutable, strictly validated configuration; a bad reload never changes live state.
  */
-record GateConfig(Map<String, Rule> servers, int transferTimeoutSeconds, int retrySeconds) {
+record GateConfig(Map<String, Rule> servers, int transferTimeoutSeconds, int retrySeconds, LimboSettings limbo) {
     static GateConfig load(Path file, Collection<String> names) throws IOException {
         Properties p = new Properties();
         if (Files.exists(file)) {
@@ -23,6 +23,9 @@ record GateConfig(Map<String, Rule> servers, int transferTimeoutSeconds, int ret
         }
         boolean changed = false;
         Map<String, String> defaults = new LinkedHashMap<>();
+        defaults.put("limbo.forwarding-mode", "AUTO");
+        defaults.put("limbo.velocity-config", "velocity.toml");
+        defaults.put("limbo.forwarding-secret-file", "");
         defaults.put("transfer-timeout-seconds", "30");
         defaults.put("backend-retry-seconds", "10");
         for (String name : new TreeSet<>(names)) {
@@ -47,7 +50,7 @@ record GateConfig(Map<String, Rule> servers, int transferTimeoutSeconds, int ret
             }
         }
         Map<String, Rule> rules = new LinkedHashMap<>();
-        Set<String> valid = new HashSet<>(List.of("transfer-timeout-seconds", "backend-retry-seconds"));
+        Set<String> valid = new HashSet<>(List.of("transfer-timeout-seconds", "backend-retry-seconds", "limbo.forwarding-mode", "limbo.velocity-config", "limbo.forwarding-secret-file"));
         for (String name : configured) {
             String k = "server." + name + ".";
             for (String field : List.of("enabled", "minimum-players", "close-below", "close-delay-seconds", "return-to-waiting"))
@@ -60,7 +63,12 @@ record GateConfig(Map<String, Rule> servers, int transferTimeoutSeconds, int ret
         int timeout = number(p, "transfer-timeout-seconds"), retry = number(p, "backend-retry-seconds");
         if (timeout < 5 || timeout > 300 || retry < 1 || retry > 3600)
             throw new IllegalArgumentException("Timeout must be 5..300; retry must be 1..3600 seconds");
-        GateConfig result = new GateConfig(Map.copyOf(rules), timeout, retry);
+        String mode = p.getProperty("limbo.forwarding-mode").trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("AUTO", "NONE", "LEGACY", "MODERN", "BUNGEEGUARD").contains(mode))
+            throw new IllegalArgumentException("Invalid limbo.forwarding-mode");
+        LimboSettings limbo = new LimboSettings(mode, p.getProperty("limbo.velocity-config").trim(),
+                p.getProperty("limbo.forwarding-secret-file").trim());
+        GateConfig result = new GateConfig(Map.copyOf(rules), timeout, retry, limbo);
         if (changed) {
             Files.createDirectories(file.getParent());
             Path temp = Files.createTempFile(file.getParent(), "gate-", ".tmp");
@@ -94,6 +102,8 @@ record GateConfig(Map<String, Rule> servers, int transferTimeoutSeconds, int ret
             throw new IllegalArgumentException(key + " must be an integer", e);
         }
     }
+
+    record LimboSettings(String mode, String velocityConfig, String secretFile) { }
 
     record Rule(boolean enabled, int minimumPlayers, int closeBelow,
                 int closeDelaySeconds, boolean returnToWaiting) {
