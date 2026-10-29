@@ -39,8 +39,8 @@ import ua.nanit.limbo.protocol.registry.Version;
 import ua.nanit.limbo.server.LimboServer;
 import ua.nanit.limbo.server.Log;
 import ua.nanit.limbo.util.ComponentUtils;
-import ua.nanit.limbo.util.UUIDUtils;
 import ua.nanit.limbo.util.ForwardingUtils;
+import ua.nanit.limbo.util.UUIDUtils;
 
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;

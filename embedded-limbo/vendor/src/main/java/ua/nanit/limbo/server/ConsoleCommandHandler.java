@@ -45,7 +45,7 @@ public final class ConsoleCommandHandler extends Thread implements CommandHandle
         if (handler != null) {
             try {
                 handler.execute();
-            } catch(Throwable t) {
+            } catch (Throwable t) {
                 Log.error("Cannot execute command:", t);
             }
             return true;
@@ -65,10 +65,10 @@ public final class ConsoleCommandHandler extends Thread implements CommandHandle
         Scanner scanner = new Scanner(System.in);
         String command;
 
-        while(true) {
+        while (true) {
             try {
                 command = scanner.nextLine().trim();
-            } catch(NoSuchElementException e) {
+            } catch (NoSuchElementException e) {
                 break;
             }
 

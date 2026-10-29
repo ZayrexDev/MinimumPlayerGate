@@ -29,10 +29,10 @@ import ua.nanit.limbo.server.data.Title;
 @AllArgsConstructor
 public class PacketTitleLegacy implements PacketOut {
 
-    private Action action;
     private final PacketTitleSetTitle title;
     private final PacketTitleSetSubTitle subtitle;
     private final PacketTitleTimes times;
+    private Action action;
 
     public PacketTitleLegacy() {
         this.title = new PacketTitleSetTitle();

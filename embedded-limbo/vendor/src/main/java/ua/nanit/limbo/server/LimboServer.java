@@ -17,16 +17,8 @@
 
 package ua.nanit.limbo.server;
 
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
-import io.netty.channel.epoll.Epoll;
-import io.netty.channel.epoll.EpollIoHandler;
-import io.netty.channel.epoll.EpollServerSocketChannel;
-import io.netty.channel.nio.NioIoHandler;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.ResourceLeakDetector;
 import lombok.Getter;
 import ua.nanit.limbo.configuration.LimboConfig;
@@ -36,28 +28,23 @@ import ua.nanit.limbo.connection.PacketHandler;
 import ua.nanit.limbo.connection.PacketSnapshots;
 import ua.nanit.limbo.world.DimensionRegistry;
 
-import java.nio.file.Paths;
-import java.util.Locale;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 @Getter
 public final class LimboServer {
+    private final LimboConfig config;
+    private final CommandHandler<Command> commandHandler;
+    private final ClassLoader classLoader;
     private boolean running = false;
     private Channel boundChannel;
-
     private PacketHandler packetHandler;
     private PacketSnapshots packetSnapshots;
     private Connections connections;
     private DimensionRegistry dimensionRegistry;
     private ScheduledFuture<?> keepAliveTask;
-
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
-
-    private final LimboConfig config;
-    private final CommandHandler<Command> commandHandler;
-    private final ClassLoader classLoader;
 
     public LimboServer(LimboConfig config, CommandHandler<Command> commandHandler, ClassLoader classLoader) {
         this.config = config;

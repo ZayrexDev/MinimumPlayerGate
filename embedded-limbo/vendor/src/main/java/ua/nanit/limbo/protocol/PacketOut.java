@@ -23,5 +23,6 @@ import ua.nanit.limbo.protocol.registry.Version;
 public interface PacketOut extends Packet {
 
     @Override
-    default void decode(@NonNull ByteMessage msg, @NonNull Version version) {}
+    default void decode(@NonNull ByteMessage msg, @NonNull Version version) {
+    }
 }

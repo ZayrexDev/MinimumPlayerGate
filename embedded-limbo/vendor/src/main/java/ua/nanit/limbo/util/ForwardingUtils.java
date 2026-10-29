@@ -32,9 +32,8 @@ import java.util.UUID;
 @UtilityClass
 public class ForwardingUtils {
 
-    private static final String ALGORITHM = "HmacSHA256";
-
     public static final byte VELOCITY_MAX_SUPPORTED_FORWARDING_VERSION = 1;
+    private static final String ALGORITHM = "HmacSHA256";
 
     public static boolean checkVelocityKeyIntegrity(@NonNull ClientConnection conn,
                                                     @NonNull ByteMessage buf) {

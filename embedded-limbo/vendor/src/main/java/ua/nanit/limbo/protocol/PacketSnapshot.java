@@ -39,6 +39,33 @@ public class PacketSnapshot implements PacketOut {
     private final Map<Version, Version> mappings = new EnumMap<>(Version.class);
 
     @NonNull
+    public static PacketSnapshot of(@NonNull PacketOut packet) {
+        return of(packet.getClass(), version -> packet);
+    }
+
+    @NonNull
+    public static PacketSnapshot of(@NonNull PacketOut packet, Version version) {
+        return of(packet.getClass(), version2 -> packet, List.of(version));
+    }
+
+    @NonNull
+    public static PacketSnapshot of(@NonNull Class<? extends PacketOut> packetClazz,
+                                    @NonNull Function<Version, PacketOut> packetComputeFunction,
+                                    @NonNull List<Version> versions) {
+        PacketSnapshot snapshot = new PacketSnapshot(packetClazz);
+        snapshot.encode(packetComputeFunction, versions);
+        return snapshot;
+    }
+
+    @NonNull
+    public static PacketSnapshot of(@NonNull Class<? extends PacketOut> packetClazz,
+                                    @NonNull Function<Version, PacketOut> packetComputeFunction) {
+        PacketSnapshot snapshot = new PacketSnapshot(packetClazz);
+        snapshot.encode(packetComputeFunction);
+        return snapshot;
+    }
+
+    @NonNull
     public Class<? extends PacketOut> getPacketClass() {
         return this.packetClazz;
     }
@@ -90,32 +117,5 @@ public class PacketSnapshot implements PacketOut {
     @Override
     public String toString() {
         return this.packetClazz.getSimpleName();
-    }
-
-    @NonNull
-    public static PacketSnapshot of(@NonNull PacketOut packet) {
-        return of(packet.getClass(), version -> packet);
-    }
-
-    @NonNull
-    public static PacketSnapshot of(@NonNull PacketOut packet, Version version) {
-        return of(packet.getClass(), version2 -> packet, List.of(version));
-    }
-
-    @NonNull
-    public static PacketSnapshot of(@NonNull Class<? extends PacketOut> packetClazz,
-                                    @NonNull Function<Version, PacketOut> packetComputeFunction,
-                                    @NonNull List<Version> versions) {
-        PacketSnapshot snapshot = new PacketSnapshot(packetClazz);
-        snapshot.encode(packetComputeFunction, versions);
-        return snapshot;
-    }
-
-    @NonNull
-    public static PacketSnapshot of(@NonNull Class<? extends PacketOut> packetClazz,
-                                    @NonNull Function<Version, PacketOut> packetComputeFunction) {
-        PacketSnapshot snapshot = new PacketSnapshot(packetClazz);
-        snapshot.encode(packetComputeFunction);
-        return snapshot;
     }
 }

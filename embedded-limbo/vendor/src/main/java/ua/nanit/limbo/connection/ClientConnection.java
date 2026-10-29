@@ -16,20 +16,13 @@
  */
 package ua.nanit.limbo.connection;
 
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.Setter;
-
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
-
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.Setter;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -47,7 +40,12 @@ import ua.nanit.limbo.server.LimboServer;
 import ua.nanit.limbo.server.Log;
 import ua.nanit.limbo.util.ComponentUtils;
 
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 @Getter
 public class ClientConnection extends ChannelInboundHandlerAdapter {

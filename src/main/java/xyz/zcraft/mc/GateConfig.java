@@ -103,7 +103,8 @@ record GateConfig(Map<String, Rule> servers, int transferTimeoutSeconds, int ret
         }
     }
 
-    record LimboSettings(String mode, String velocityConfig, String secretFile) { }
+    record LimboSettings(String mode, String velocityConfig, String secretFile) {
+    }
 
     record Rule(boolean enabled, int minimumPlayers, int closeBelow,
                 int closeDelaySeconds, boolean returnToWaiting) {

@@ -40,6 +40,62 @@ public class PacketChunkWithLight implements PacketOut {
     private int z;
     private VersionedDimension dimension;
 
+    private static ByteBuf createEmptySection(@NonNull Version version,
+                                              @NonNull PaletteFactory blocksPalette,
+                                              @NonNull PaletteFactory biomesPalette) {
+        ByteMessage buf = new ByteMessage(ByteBufAllocator.DEFAULT.heapBuffer());
+        buf.writeShort(0); // no empty blocks count
+        if (version.moreOrEqual(Version.V26_1)) {
+            buf.writeShort(0); // fluid count
+        }
+        long[] storage = new long[0];
+        writePalette(buf, version, blocksPalette, storage);
+        writePalette(buf, version, biomesPalette, storage);
+        return buf;
+    }
+
+    private static void writePalette(@NonNull ByteMessage buf,
+                                     @NonNull Version version,
+                                     @NonNull PaletteFactory paletteFactory,
+                                     long[] storage) {
+        buf.writeByte(paletteFactory.getId());
+        paletteFactory.writeData(buf, version);
+        if (version.moreOrEqual(Version.V1_21_5)) {
+            for (long data : storage) {
+                buf.writeLong(data);
+            }
+            return;
+        }
+        buf.writeVarInt(storage.length);
+        for (long data : storage) {
+            buf.writeLong(data);
+        }
+    }
+
+    private static void writeHeightmaps(@NonNull ByteMessage buf,
+                                        @NonNull Version version,
+                                        @NonNull Map<HeightMapType, long[]> heightMaps) {
+        if (version.moreOrEqual(Version.V1_21_5)) {
+            buf.writeVarInt(heightMaps.size());
+            for (Map.Entry<HeightMapType, long[]> entry : heightMaps.entrySet()) {
+                buf.writeVarInt(entry.getKey().ordinal());
+                long[] bitSet = entry.getValue();
+                buf.writeVarInt(bitSet.length);
+                for (long l : bitSet) {
+                    buf.writeLong(l);
+                }
+            }
+            return;
+        }
+        CompoundBinaryTag.Builder tagBuilder = CompoundBinaryTag.builder();
+        for (Map.Entry<HeightMapType, long[]> entry : heightMaps.entrySet()) {
+            tagBuilder.put(entry.getKey().name(), LongArrayBinaryTag.longArrayBinaryTag(entry.getValue()));
+        }
+        CompoundBinaryTag rootTag = CompoundBinaryTag.builder()
+                .put("root", tagBuilder.build()).build();
+        buf.writeCompoundTag(rootTag, version);
+    }
+
     @Override
     public void encode(@NonNull ByteMessage buf, @NonNull Version version) {
         buf.writeInt(this.x);
@@ -73,38 +129,6 @@ public class PacketChunkWithLight implements PacketOut {
         }
     }
 
-    private static ByteBuf createEmptySection(@NonNull Version version,
-                                              @NonNull PaletteFactory blocksPalette,
-                                              @NonNull PaletteFactory biomesPalette) {
-        ByteMessage buf = new ByteMessage(ByteBufAllocator.DEFAULT.heapBuffer());
-        buf.writeShort(0); // no empty blocks count
-        if (version.moreOrEqual(Version.V26_1)) {
-            buf.writeShort(0); // fluid count
-        }
-        long[] storage = new long[0];
-        writePalette(buf, version, blocksPalette, storage);
-        writePalette(buf, version, biomesPalette, storage);
-        return buf;
-    }
-
-    private static void writePalette(@NonNull ByteMessage buf,
-                                     @NonNull Version version,
-                                     @NonNull PaletteFactory paletteFactory,
-                                     long[] storage) {
-        buf.writeByte(paletteFactory.getId());
-        paletteFactory.writeData(buf, version);
-        if (version.moreOrEqual(Version.V1_21_5)) {
-            for (long data : storage) {
-                buf.writeLong(data);
-            }
-            return;
-        }
-        buf.writeVarInt(storage.length);
-        for (long data : storage) {
-            buf.writeLong(data);
-        }
-    }
-
     private void writeLightData(@NonNull ByteMessage buf, @NonNull Version version) {
         buf.writeBitSet(null); // Sky y mask
         buf.writeBitSet(null); // Block y mask
@@ -119,30 +143,6 @@ public class PacketChunkWithLight implements PacketOut {
         buf.writeVarInt(0);
         // Skip block updates
         buf.writeVarInt(0);
-    }
-
-    private static void writeHeightmaps(@NonNull ByteMessage buf,
-                                        @NonNull Version version,
-                                        @NonNull Map<HeightMapType, long[]> heightMaps) {
-        if (version.moreOrEqual(Version.V1_21_5)) {
-            buf.writeVarInt(heightMaps.size());
-            for (Map.Entry<HeightMapType, long[]> entry : heightMaps.entrySet()) {
-                buf.writeVarInt(entry.getKey().ordinal());
-                long[] bitSet = entry.getValue();
-                buf.writeVarInt(bitSet.length);
-                for (long l : bitSet) {
-                    buf.writeLong(l);
-                }
-            }
-            return;
-        }
-        CompoundBinaryTag.Builder tagBuilder = CompoundBinaryTag.builder();
-        for (Map.Entry<HeightMapType, long[]> entry : heightMaps.entrySet()) {
-            tagBuilder.put(entry.getKey().name(), LongArrayBinaryTag.longArrayBinaryTag(entry.getValue()));
-        }
-        CompoundBinaryTag rootTag = CompoundBinaryTag.builder()
-                .put("root", tagBuilder.build()).build();
-        buf.writeCompoundTag(rootTag, version);
     }
 
     public enum HeightMapType {

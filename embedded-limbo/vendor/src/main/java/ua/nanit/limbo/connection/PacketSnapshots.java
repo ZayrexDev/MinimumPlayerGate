@@ -46,6 +46,7 @@ import java.util.concurrent.ThreadLocalRandom;
 @Getter
 public final class PacketSnapshots {
 
+    private static Map<Version, List<PacketSnapshot>> packetsRegistryData;
     private PacketSnapshot packetLoginSuccess;
     private PacketSnapshot packetJoinGame;
     private PacketSnapshot packetSpawnPosition;
@@ -56,22 +57,16 @@ public final class PacketSnapshots {
     private PacketSnapshot packetJoinMessage;
     private PacketSnapshot packetBossBar;
     private PacketSnapshot packetHeaderAndFooter;
-
     private PacketSnapshot packetPlayerPosAndLookLegacy;
     // For 1.19 we need to spawn player outside the world to avoid stuck in terrain loading
     private PacketSnapshot packetPlayerPosAndLook;
-
     private PacketSnapshot packetTitleTitle;
     private PacketSnapshot packetTitleSubtitle;
     private PacketSnapshot packetTitleTimes;
-
     private PacketSnapshot packetTitleLegacyTitle;
     private PacketSnapshot packetTitleLegacySubtitle;
     private PacketSnapshot packetTitleLegacyTimes;
-
     private PacketSnapshot packetRegistryData;
-    private static Map<Version, List<PacketSnapshot>> packetsRegistryData;
-
     private PacketSnapshot packetKnownPacks;
 
     private PacketSnapshot packetUpdateTags;
@@ -284,12 +279,12 @@ public final class PacketSnapshots {
         packetsChunks = chunks;
     }
 
-    public List<PacketSnapshot> getPacketsChunks() {
-        return Collections.unmodifiableList(packetsChunks);
-    }
-
     @Nullable
     public static List<PacketSnapshot> getPacketsRegistryData(@NonNull Version version) {
         return packetsRegistryData.get(version);
+    }
+
+    public List<PacketSnapshot> getPacketsChunks() {
+        return Collections.unmodifiableList(packetsChunks);
     }
 }

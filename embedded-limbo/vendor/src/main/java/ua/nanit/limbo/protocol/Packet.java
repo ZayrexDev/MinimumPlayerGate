@@ -28,5 +28,6 @@ public interface Packet {
 
     void decode(@NonNull ByteMessage msg, @NonNull Version version);
 
-    default void handle(@NonNull ClientConnection conn, @NonNull LimboServer server) {}
+    default void handle(@NonNull ClientConnection conn, @NonNull LimboServer server) {
+    }
 }

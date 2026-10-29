@@ -18,7 +18,10 @@
 package ua.nanit.limbo.protocol.packets.configuration;
 
 import io.netty.handler.codec.DecoderException;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
 import ua.nanit.limbo.connection.ClientConnection;
 import ua.nanit.limbo.protocol.ByteMessage;
 import ua.nanit.limbo.protocol.PacketIn;

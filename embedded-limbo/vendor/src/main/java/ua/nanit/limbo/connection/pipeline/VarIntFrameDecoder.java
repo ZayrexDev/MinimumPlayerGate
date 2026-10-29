@@ -27,43 +27,6 @@ import java.util.List;
 
 public class VarIntFrameDecoder extends ByteToMessageDecoder {
 
-    @Override
-    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
-        if (!ctx.channel().isActive()) {
-            in.clear();
-            return;
-        }
-
-        // Skip any runs of 0x00 we might find
-        final int packetStart = in.forEachByte(ByteProcessor.FIND_NON_NUL);
-        if (packetStart == -1) {
-            in.clear();
-            return;
-        }
-        in.readerIndex(packetStart);
-
-        // Try to read the length of the packet
-        in.markReaderIndex();
-        final int preIndex = in.readerIndex();
-        final int length = readRawVarInt21(in);
-        if (preIndex == in.readerIndex()) {
-            return;
-        }
-        if (length < 0) {
-            throw new DecoderException("Bad VarInt length: " + length);
-        }
-
-        if (length == 0) {
-            return;
-        }
-
-        if (in.readableBytes() < length) {
-            in.resetReaderIndex();
-        } else {
-            out.add(in.readRetainedSlice(length));
-        }
-    }
-
     private static int readRawVarInt21(ByteBuf byteBuf) {
         if (byteBuf.readableBytes() < 4) {
             // we don't have enough that we can read a potentially full varint, so fall back to
@@ -125,5 +88,42 @@ public class VarIntFrameDecoder extends ByteToMessageDecoder {
             return result | tmp << 14;
         }
         return result | (tmp & 0x7F) << 14;
+    }
+
+    @Override
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
+        if (!ctx.channel().isActive()) {
+            in.clear();
+            return;
+        }
+
+        // Skip any runs of 0x00 we might find
+        final int packetStart = in.forEachByte(ByteProcessor.FIND_NON_NUL);
+        if (packetStart == -1) {
+            in.clear();
+            return;
+        }
+        in.readerIndex(packetStart);
+
+        // Try to read the length of the packet
+        in.markReaderIndex();
+        final int preIndex = in.readerIndex();
+        final int length = readRawVarInt21(in);
+        if (preIndex == in.readerIndex()) {
+            return;
+        }
+        if (length < 0) {
+            throw new DecoderException("Bad VarInt length: " + length);
+        }
+
+        if (length == 0) {
+            return;
+        }
+
+        if (in.readableBytes() < length) {
+            in.resetReaderIndex();
+        } else {
+            out.add(in.readRetainedSlice(length));
+        }
     }
 }

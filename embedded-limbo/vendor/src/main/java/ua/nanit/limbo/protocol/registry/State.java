@@ -459,6 +459,18 @@ public enum State {
     public final ProtocolMappings serverBound = new ProtocolMappings();
     public final ProtocolMappings clientBound = new ProtocolMappings();
 
+    /**
+     * Map packet id to version range
+     *
+     * @param packetId Packet id
+     * @param from     Minimal version (include)
+     * @param to       Last version (include)
+     * @return Created mapping
+     */
+    private static Mapping map(int packetId, @NonNull Version from, @NonNull Version to) {
+        return new Mapping(packetId, from, to);
+    }
+
     public static class ProtocolMappings {
         private final Map<Version, PacketRegistry> registry = new EnumMap<>(Version.class);
 
@@ -520,17 +532,5 @@ public enum State {
     }
 
     public record Mapping(int packetId, @NonNull Version from, @NonNull Version to) {
-    }
-
-    /**
-     * Map packet id to version range
-     *
-     * @param packetId Packet id
-     * @param from     Minimal version (include)
-     * @param to       Last version (include)
-     * @return Created mapping
-     */
-    private static Mapping map(int packetId, @NonNull Version from, @NonNull Version to) {
-        return new Mapping(packetId, from, to);
     }
 }

@@ -28,7 +28,6 @@ import net.kyori.adventure.nbt.BinaryTagIO;
 import net.kyori.adventure.nbt.CompoundBinaryTag;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
-import org.jetbrains.annotations.NotNull;
 import ua.nanit.limbo.connection.PlayerPublicKey;
 import ua.nanit.limbo.protocol.registry.Version;
 import ua.nanit.limbo.server.data.NamespacedKey;
@@ -52,13 +51,24 @@ public class ByteMessage extends ByteBuf {
 
     private final ByteBuf buf;
 
+    private static void writeFixedBitSet(BitSet bits, int size, ByteBuf buf) {
+        if (bits.length() > size) {
+            throw new StackOverflowError("BitSet too large (expected " + size + " got " + bits.size() + ")");
+        }
+        buf.writeBytes(Arrays.copyOf(bits.toByteArray(), (size + 8) >> 3));
+    }
+
+    /* Minecraft's protocol methods */
+
+    public static ByteMessage create() {
+        return new ByteMessage(Unpooled.buffer());
+    }
+
     public byte[] toByteArray() {
         byte[] bytes = new byte[buf.readableBytes()];
         buf.readBytes(bytes);
         return bytes;
     }
-
-    /* Minecraft's protocol methods */
 
     public int readVarInt() {
         final int readable = buf.readableBytes();
@@ -282,13 +292,6 @@ public class ByteMessage extends ByteBuf {
         writeFixedBitSet(bits, enums.length, buf);
     }
 
-    private static void writeFixedBitSet(BitSet bits, int size, ByteBuf buf) {
-        if (bits.length() > size) {
-            throw new StackOverflowError("BitSet too large (expected " + size + " got " + bits.size() + ")");
-        }
-        buf.writeBytes(Arrays.copyOf(bits.toByteArray(), (size + 8) >> 3));
-    }
-
     public PlayerPublicKey readPublicKey() {
         if (buf.readBoolean()) {
             return new PlayerPublicKey(readLong(), readArray(512), readArray(4096));
@@ -301,6 +304,8 @@ public class ByteMessage extends ByteBuf {
         return readArray(this.buf.readableBytes());
     }
 
+    /* Delegated methods */
+
     public byte[] readArray(int limit) {
         int len = readVarInt();
         if (len > limit) {
@@ -310,8 +315,6 @@ public class ByteMessage extends ByteBuf {
         this.buf.readBytes(ret);
         return ret;
     }
-
-    /* Delegated methods */
 
     @Override
     public int capacity() {
@@ -1278,9 +1281,5 @@ public class ByteMessage extends ByteBuf {
     @Override
     public boolean release(int decrement) {
         return buf.release(decrement);
-    }
-
-    public static ByteMessage create() {
-        return new ByteMessage(Unpooled.buffer());
     }
 }

@@ -5,11 +5,18 @@ import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.event.EventTask;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
-import com.velocitypowered.api.event.player.*;
-import com.velocitypowered.api.event.proxy.*;
+import com.velocitypowered.api.event.player.KickedFromServerEvent;
+import com.velocitypowered.api.event.player.ServerPostConnectEvent;
+import com.velocitypowered.api.event.player.ServerPreConnectEvent;
+import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
-import com.velocitypowered.api.proxy.*;
-import com.velocitypowered.api.proxy.server.*;
+import com.velocitypowered.api.proxy.ConnectionRequestBuilder;
+import com.velocitypowered.api.proxy.Player;
+import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
+import com.velocitypowered.api.proxy.server.ServerInfo;
+import com.velocitypowered.api.proxy.server.ServerPing;
 import net.kyori.adventure.text.Component;
 import org.slf4j.Logger;
 import xyz.zcraft.mc.embedded.EmbeddedWaitingServer;
@@ -18,14 +25,18 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** State is confined to actor; the embedded server uses its own relocated network stack. */
+/**
+ * State is confined to actor; the embedded server uses its own relocated network stack.
+ */
 public final class MinimumPlayerGate {
     static final String WAITING_SERVER = "minimum-player-gate-waiting";
     private final ProxyServer proxy;
     private final Logger logger;
     private final Path directory;
     private final ScheduledExecutorService actor = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "minimum-player-gate"); t.setDaemon(true); return t;
+        Thread t = new Thread(r, "minimum-player-gate");
+        t.setDaemon(true);
+        return t;
     });
     private final Map<String, Backend> backends = new LinkedHashMap<>();
     private final Map<UUID, Visit> visits = new HashMap<>();
@@ -38,14 +49,17 @@ public final class MinimumPlayerGate {
 
     @Inject
     public MinimumPlayerGate(ProxyServer proxy, Logger logger, @DataDirectory Path directory) {
-        this.proxy = proxy; this.logger = logger; this.directory = directory;
+        this.proxy = proxy;
+        this.logger = logger;
+        this.directory = directory;
     }
 
     @Subscribe
     public void initialize(ProxyInitializeEvent event) {
         try {
             reload();
-            if (proxy.getServer(WAITING_SERVER).isPresent()) throw new IllegalStateException("Reserved backend name already registered: " + WAITING_SERVER);
+            if (proxy.getServer(WAITING_SERVER).isPresent())
+                throw new IllegalStateException("Reserved backend name already registered: " + WAITING_SERVER);
             var limbo = config.limbo();
             room = EmbeddedWaitingServer.create(limbo.mode(), Path.of(limbo.velocityConfig()), limbo.secretFile());
             waitingServer = proxy.registerServer(new ServerInfo(WAITING_SERVER, room.address()));
@@ -62,14 +76,22 @@ public final class MinimumPlayerGate {
     private void reload() throws Exception {
         GateConfig next = GateConfig.load(directory.resolve("config.properties"), proxy.getAllServers().stream()
                 .map(s -> s.getServerInfo().getName()).filter(n -> !n.equals(WAITING_SERVER)).toList());
-        if (ready && !config.limbo().equals(next.limbo())) throw new IllegalArgumentException("Limbo connection settings require a proxy restart");
-        config = next; revision++;
+        if (ready && !config.limbo().equals(next.limbo()))
+            throw new IllegalArgumentException("Limbo connection settings require a proxy restart");
+        config = next;
+        revision++;
         for (RegisteredServer server : proxy.getAllServers()) {
             String name = server.getServerInfo().getName();
             if (name.equals(WAITING_SERVER)) continue;
             Backend b = backends.get(name);
-            if (b == null || b.server != server) { b = new Backend(server, config.servers().get(name)); backends.put(name, b); }
-            b.rule = config.servers().get(name); b.state.resetGrace(); b.probing = false; b.nextProbe = 0;
+            if (b == null || b.server != server) {
+                b = new Backend(server, config.servers().get(name));
+                backends.put(name, b);
+            }
+            b.rule = config.servers().get(name);
+            b.state.resetGrace();
+            b.probing = false;
+            b.nextProbe = 0;
         }
         for (Visit v : List.copyOf(visits.values())) {
             if (backends.get(name(v.target)) != v.target || proxy.getServer(name(v.target)).orElse(null) != v.target.server)
@@ -91,13 +113,20 @@ public final class MinimumPlayerGate {
             var allowed = event.getResult().getServer();
             if (allowed.isEmpty()) return;
             Player p = event.getPlayer();
-            if (!p.isActive() || retired.contains(p)) { deny(event); return; }
+            if (!p.isActive() || retired.contains(p)) {
+                deny(event);
+                return;
+            }
             RegisteredServer destination = allowed.get();
             Visit v = current(p);
             if (v != null && v.phase != Phase.WAITING) {
                 RegisteredServer expected = v.phase == Phase.ENTERING ? waitingServer : v.target.server;
-                if (destination == expected && !v.permitUsed) { v.permitUsed = true; return; }
-                deny(event); return;
+                if (destination == expected && !v.permitUsed) {
+                    v.permitUsed = true;
+                    return;
+                }
+                deny(event);
+                return;
             }
             if (v == null && on(p, destination)) return; // Already a resident, not a new arrival.
             Backend target = backends.get(destination.getServerInfo().getName());
@@ -110,13 +139,20 @@ public final class MinimumPlayerGate {
                 return;
             }
             if (v != null) {
-                v.target = target; v.nextAttempt = 0;
-                deny(event); tick(); // Already in waiting: reassign without reconnecting the room.
+                v.target = target;
+                v.nextAttempt = 0;
+                deny(event);
+                tick(); // Already in waiting: reassign without reconnecting the room.
             } else if (!target.state.open) {
                 v = enqueue(p, target);
-                if (v == null) { deny(event); return; }
+                if (v == null) {
+                    deny(event);
+                    return;
+                }
                 if (on(p, waitingServer)) {
-                    v.phase = Phase.WAITING; deny(event); tick();
+                    v.phase = Phase.WAITING;
+                    deny(event);
+                    tick();
                 } else {
                     v.permitUsed = true;
                     event.setResult(ServerPreConnectEvent.ServerResult.allowed(waitingServer));
@@ -124,8 +160,12 @@ public final class MinimumPlayerGate {
             } else {
                 // Count direct admissions while they are connecting, too.
                 v = enqueue(p, target);
-                if (v == null) { deny(event); return; }
-                v.phase = Phase.RELEASING; v.permitUsed = true;
+                if (v == null) {
+                    deny(event);
+                    return;
+                }
+                v.phase = Phase.RELEASING;
+                v.permitUsed = true;
             }
         });
     }
@@ -144,7 +184,8 @@ public final class MinimumPlayerGate {
         submit(() -> {
             Visit v = current(event.getPlayer());
             if (v != null) visits.remove(v.player.getUniqueId(), v);
-            retired.remove(event.getPlayer()); tick();
+            retired.remove(event.getPlayer());
+            tick();
         });
     }
 
@@ -175,7 +216,9 @@ public final class MinimumPlayerGate {
             if (old.player == player) return old;
             fail(old, "A newer connection replaced this waiting session.");
         }
-        Visit v = new Visit(player, target, deadline()); visits.put(player.getUniqueId(), v); return v;
+        Visit v = new Visit(player, target, deadline());
+        visits.put(player.getUniqueId(), v);
+        return v;
     }
 
     private void settle(Visit v) {
@@ -190,9 +233,13 @@ public final class MinimumPlayerGate {
 
     private void tick() {
         if (!ready) return;
-        long now = System.nanoTime(); retired.removeIf(p -> !p.isActive());
+        long now = System.nanoTime();
+        retired.removeIf(p -> !p.isActive());
         for (Visit v : List.copyOf(visits.values())) {
-            if (!v.player.isActive()) { visits.remove(v.player.getUniqueId(), v); continue; }
+            if (!v.player.isActive()) {
+                visits.remove(v.player.getUniqueId(), v);
+                continue;
+            }
             settle(v);
             if (!owns(v)) continue;
             if (v.phase != Phase.WAITING && now >= v.deadline) {
@@ -216,7 +263,8 @@ public final class MinimumPlayerGate {
                 logger.info("Gate {} {} (population {})", name(b), b.state.open ? "opened" : "closed", count);
             if (!b.state.open && b.rule.enabled() && b.rule.returnToWaiting()) {
                 for (Player p : residents) {
-                    Visit v = enqueue(p, b); if (v != null) transfer(v, waitingServer);
+                    Visit v = enqueue(p, b);
+                    if (v != null) transfer(v, waitingServer);
                 }
             }
             if (b.state.open && !b.probing && now >= b.nextProbe && queue.stream().anyMatch(v -> v.phase == Phase.WAITING && now >= v.nextAttempt))
@@ -228,37 +276,50 @@ public final class MinimumPlayerGate {
         b.probing = true;
         long generation = revision;
         CompletableFuture<ServerPing> request;
-        try { request = b.server.ping(); } catch (RuntimeException e) { request = CompletableFuture.failedFuture(e); }
+        try {
+            request = b.server.ping();
+        } catch (RuntimeException e) {
+            request = CompletableFuture.failedFuture(e);
+        }
         request.orTimeout(5, TimeUnit.SECONDS).whenComplete((ping, error) -> submit(() -> {
             if (generation != revision || backends.get(name(b)) != b) return;
-            b.probing = false; b.nextProbe = retryAt();
+            b.probing = false;
+            b.nextProbe = retryAt();
             tick();
             if (error != null || !b.state.open) return;
             for (Visit v : queue(b)) {
                 if (v.phase != Phase.WAITING || !v.player.isActive() || System.nanoTime() < v.nextAttempt) continue;
-                v.phase = Phase.RELEASING; transfer(v, b.server);
+                v.phase = Phase.RELEASING;
+                transfer(v, b.server);
             }
         }));
     }
 
     private void transfer(Visit v, RegisteredServer destination) {
-        v.deadline = deadline(); v.permitUsed = false;
+        v.deadline = deadline();
+        v.permitUsed = false;
         long attempt = ++v.attempt;
         CompletableFuture<ConnectionRequestBuilder.Result> request;
-        try { request = v.player.createConnectionRequest(destination).connect(); }
-        catch (RuntimeException e) { request = CompletableFuture.failedFuture(e); }
+        try {
+            request = v.player.createConnectionRequest(destination).connect();
+        } catch (RuntimeException e) {
+            request = CompletableFuture.failedFuture(e);
+        }
         request.whenComplete((result, error) -> submit(() -> {
             if (!owns(v) || attempt != v.attempt) return;
             if (error == null && result != null && (result.isSuccessful()
                     || result.getStatus() == ConnectionRequestBuilder.Status.ALREADY_CONNECTED)) {
-                settle(v); return;
+                settle(v);
+                return;
             }
             if (v.phase == Phase.ENTERING) {
-                fail(v, "Unable to enter virtual waiting room. Please reconnect."); return;
+                fail(v, "Unable to enter virtual waiting room. Please reconnect.");
+                return;
             }
             if (on(v.player, waitingServer) && (error != null || (result != null
                     && result.getStatus() == ConnectionRequestBuilder.Status.CONNECTION_IN_PROGRESS))) {
-                v.phase = Phase.WAITING; v.nextAttempt = retryAt();
+                v.phase = Phase.WAITING;
+                v.nextAttempt = retryAt();
                 v.player.sendMessage(Component.text("Backend unavailable; you remain queued. Retrying shortly."));
             } else {
                 // Cancellation / server rejection must not be retried automatically.
@@ -276,22 +337,65 @@ public final class MinimumPlayerGate {
                 .filter(p -> !visits.containsKey(p.getUniqueId()) && !retired.contains(p))
                 .filter(p -> on(p, b.server)).toList();
     }
-    private List<Visit> queue(Backend b) { return visits.values().stream().filter(v -> v.target == b).toList(); }
-    private boolean on(Player p, RegisteredServer s) { return p.getCurrentServer().map(c -> c.getServer() == s).orElse(false); }
-    private Visit current(Player p) { Visit v = visits.get(p.getUniqueId()); return v != null && v.player == p ? v : null; }
-    private boolean owns(Visit v) { return current(v.player) == v; }
-    private String name(Backend b) { return b.server.getServerInfo().getName(); }
-    private long deadline() { return System.nanoTime() + config.transferTimeoutSeconds() * 1_000_000_000L; }
-    private long retryAt() { return System.nanoTime() + config.retrySeconds() * 1_000_000_000L; }
-    private void deny(ServerPreConnectEvent e) { e.setResult(ServerPreConnectEvent.ServerResult.denied()); }
+
+    private List<Visit> queue(Backend b) {
+        return visits.values().stream().filter(v -> v.target == b).toList();
+    }
+
+    private boolean on(Player p, RegisteredServer s) {
+        return p.getCurrentServer().map(c -> c.getServer() == s).orElse(false);
+    }
+
+    private Visit current(Player p) {
+        Visit v = visits.get(p.getUniqueId());
+        return v != null && v.player == p ? v : null;
+    }
+
+    private boolean owns(Visit v) {
+        return current(v.player) == v;
+    }
+
+    private String name(Backend b) {
+        return b.server.getServerInfo().getName();
+    }
+
+    private long deadline() {
+        return System.nanoTime() + config.transferTimeoutSeconds() * 1_000_000_000L;
+    }
+
+    private long retryAt() {
+        return System.nanoTime() + config.retrySeconds() * 1_000_000_000L;
+    }
+
+    private void deny(ServerPreConnectEvent e) {
+        e.setResult(ServerPreConnectEvent.ServerResult.denied());
+    }
+
     private void fail(Visit v, String message) {
         if (visits.remove(v.player.getUniqueId(), v) && v.player.isActive()) {
-            retired.add(v.player); v.player.disconnect(Component.text(message));
+            retired.add(v.player);
+            v.player.disconnect(Component.text(message));
         }
     }
-    private void guarded(Runnable task) { try { task.run(); } catch (Exception e) { logger.error("Gate operation failed", e); } }
-    private void submit(Runnable task) { try { actor.execute(() -> guarded(task)); } catch (RejectedExecutionException ignored) { } }
-    private EventTask onActor(Runnable task) { return EventTask.resumeWhenComplete(CompletableFuture.runAsync(task, actor)); }
+
+    private void guarded(Runnable task) {
+        try {
+            task.run();
+        } catch (Exception e) {
+            logger.error("Gate operation failed", e);
+        }
+    }
+
+    private void submit(Runnable task) {
+        try {
+            actor.execute(() -> guarded(task));
+        } catch (RejectedExecutionException ignored) {
+        }
+    }
+
+    private EventTask onActor(Runnable task) {
+        return EventTask.resumeWhenComplete(CompletableFuture.runAsync(task, actor));
+    }
 
     @Subscribe
     public EventTask shutdown(ProxyShutdownEvent event) {
@@ -304,44 +408,70 @@ public final class MinimumPlayerGate {
         });
     }
 
-    private enum Phase { ENTERING, WAITING, RELEASING }
+    private enum Phase {ENTERING, WAITING, RELEASING}
+
     private static final class Backend {
         final RegisteredServer server;
         final GateState state = new GateState();
         GateConfig.Rule rule;
         boolean probing;
         long nextProbe;
-        Backend(RegisteredServer server, GateConfig.Rule rule) { this.server = server; this.rule = rule; }
+
+        Backend(RegisteredServer server, GateConfig.Rule rule) {
+            this.server = server;
+            this.rule = rule;
+        }
     }
+
     private static final class Visit {
         final Player player;
         Backend target;
         Phase phase = Phase.ENTERING;
         long deadline, nextAttempt, attempt;
         boolean permitUsed;
-        Visit(Player player, Backend target, long deadline) { this.player = player; this.target = target; this.deadline = deadline; }
+
+        Visit(Player player, Backend target, long deadline) {
+            this.player = player;
+            this.target = target;
+            this.deadline = deadline;
+        }
     }
+
     private final class GateCommand implements SimpleCommand {
-        @Override public void execute(Invocation invocation) {
+        @Override
+        public void execute(Invocation invocation) {
             submit(() -> {
                 String[] args = invocation.arguments();
                 if (args.length == 1 && args[0].equalsIgnoreCase("reload") && invocation.source().hasPermission("minimumplayergate.admin")) {
-                    try { reload(); tick(); invocation.source().sendMessage(Component.text("Gate configuration reloaded.")); }
-                    catch (Exception e) { logger.warn("Rejected gate reload", e); invocation.source().sendMessage(Component.text("Reload rejected: " + e.getMessage())); }
+                    try {
+                        reload();
+                        tick();
+                        invocation.source().sendMessage(Component.text("Gate configuration reloaded."));
+                    } catch (Exception e) {
+                        logger.warn("Rejected gate reload", e);
+                        invocation.source().sendMessage(Component.text("Reload rejected: " + e.getMessage()));
+                    }
                 } else if (args.length == 2 && args[0].equalsIgnoreCase("join") && invocation.source() instanceof Player p) {
                     Backend b = backends.get(args[1]);
-                    if (b == null) { p.sendMessage(Component.text("Unknown server: " + args[1])); return; }
+                    if (b == null) {
+                        p.sendMessage(Component.text("Unknown server: " + args[1]));
+                        return;
+                    }
                     p.createConnectionRequest(b.server).connect().whenComplete((result, error) -> {
                         if (error != null) p.sendMessage(Component.text("Connection failed. Please try again."));
                     });
                 } else if (args.length == 1 && args[0].equalsIgnoreCase("leave") && invocation.source() instanceof Player p) {
                     Visit v = current(p);
-                    if (v != null && v.phase == Phase.WAITING) { visits.remove(p.getUniqueId(), v); p.sendMessage(Component.text("You left the queue.")); tick(); }
-                    else p.sendMessage(Component.text("No waiting queue, or a transfer is in progress."));
+                    if (v != null && v.phase == Phase.WAITING) {
+                        visits.remove(p.getUniqueId(), v);
+                        p.sendMessage(Component.text("You left the queue."));
+                        tick();
+                    } else p.sendMessage(Component.text("No waiting queue, or a transfer is in progress."));
                 } else {
-                    for (Backend b : backends.values()) invocation.source().sendMessage(Component.text(name(b) + ": "
-                            + (b.state.open ? "open" : "closed") + ", backend=" + residents(b).size()
-                            + ", queue/transfers=" + queue(b).size() + ", minimum=" + b.rule.minimumPlayers()));
+                    for (Backend b : backends.values())
+                        invocation.source().sendMessage(Component.text(name(b) + ": "
+                                + (b.state.open ? "open" : "closed") + ", backend=" + residents(b).size()
+                                + ", queue/transfers=" + queue(b).size() + ", minimum=" + b.rule.minimumPlayers()));
                     invocation.source().sendMessage(Component.text("/gate join <server>; /gate leave; /gate reload (admin)"));
                 }
             });

@@ -17,15 +17,6 @@
 
 package ua.nanit.limbo.configuration;
 
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.SocketAddress;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -34,11 +25,22 @@ import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.ConfigurationOptions;
 import org.spongepowered.configurate.serialize.TypeSerializerCollection;
 import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
-
 import ua.nanit.limbo.configuration.serializers.*;
 import ua.nanit.limbo.server.TransportType;
-import ua.nanit.limbo.server.data.*;
+import ua.nanit.limbo.server.data.BossBar;
+import ua.nanit.limbo.server.data.InfoForwarding;
+import ua.nanit.limbo.server.data.PingData;
+import ua.nanit.limbo.server.data.Title;
 import ua.nanit.limbo.world.DimensionType;
+
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.SocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @RequiredArgsConstructor
 @Getter

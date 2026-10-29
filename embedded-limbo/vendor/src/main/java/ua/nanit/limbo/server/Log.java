@@ -36,6 +36,10 @@ public final class Log {
         return debugLevel;
     }
 
+    static void setLevel(int level) {
+        debugLevel = level;
+    }
+
     public static void info(@NonNull Object msg, @Nullable Object... args) {
         print(Level.INFO, msg, null, args);
     }
@@ -78,10 +82,6 @@ public final class Log {
 
     private static String getTime() {
         return LocalTime.now().format(FORMATTER);
-    }
-
-    static void setLevel(int level) {
-        debugLevel = level;
     }
 
     @AllArgsConstructor

@@ -23,5 +23,6 @@ import ua.nanit.limbo.protocol.registry.Version;
 public interface PacketIn extends Packet {
 
     @Override
-    default void encode(@NonNull ByteMessage msg, @NonNull Version version) {}
+    default void encode(@NonNull ByteMessage msg, @NonNull Version version) {
+    }
 }

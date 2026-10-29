@@ -17,16 +17,15 @@
 
 package ua.nanit.limbo.configuration;
 
-import java.net.SocketAddress;
-
 import net.kyori.adventure.text.Component;
-
 import ua.nanit.limbo.server.TransportType;
 import ua.nanit.limbo.server.data.BossBar;
 import ua.nanit.limbo.server.data.InfoForwarding;
 import ua.nanit.limbo.server.data.PingData;
 import ua.nanit.limbo.server.data.Title;
 import ua.nanit.limbo.world.DimensionType;
+
+import java.net.SocketAddress;
 
 public interface LimboConfig {
     SocketAddress getAddress();

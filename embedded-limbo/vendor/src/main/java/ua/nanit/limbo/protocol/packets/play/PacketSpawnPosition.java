@@ -38,6 +38,10 @@ public class PacketSpawnPosition implements PacketOut {
     private float yaw;
     private float pitch;
 
+    private static long encodePosition(long x, long y, long z) {
+        return ((x & 0x3FFFFFF) << 38) | ((z & 0x3FFFFFF) << 12) | (y & 0xFFF);
+    }
+
     @Override
     public void encode(@NonNull ByteMessage msg, @NonNull Version version) {
         if (version.moreOrEqual(Version.V1_21_9)) {
@@ -53,9 +57,5 @@ public class PacketSpawnPosition implements PacketOut {
     @Override
     public String toString() {
         return getClass().getSimpleName();
-    }
-
-    private static long encodePosition(long x, long y, long z) {
-        return ((x & 0x3FFFFFF) << 38) | ((z & 0x3FFFFFF) << 12) | (y & 0xFFF);
     }
 }

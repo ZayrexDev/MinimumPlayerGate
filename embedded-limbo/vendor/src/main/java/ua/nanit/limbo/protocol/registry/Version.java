@@ -116,6 +116,21 @@ public enum Version {
     private final String displayName;
     private Version prev;
 
+    @NonNull
+    public static Version getMin() {
+        return V1_7_2;
+    }
+
+    @NonNull
+    public static Version getMax() {
+        return MAX;
+    }
+
+    @NonNull
+    public static Version of(int protocolNumber) {
+        return VERSION_MAP.getOrDefault(protocolNumber, UNDEFINED);
+    }
+
     public boolean more(@NonNull Version another) {
         return this.protocolNumber > another.protocolNumber;
     }
@@ -138,20 +153,5 @@ public enum Version {
 
     public boolean isSupported() {
         return this != UNDEFINED;
-    }
-
-    @NonNull
-    public static Version getMin() {
-        return V1_7_2;
-    }
-
-    @NonNull
-    public static Version getMax() {
-        return MAX;
-    }
-
-    @NonNull
-    public static Version of(int protocolNumber) {
-        return VERSION_MAP.getOrDefault(protocolNumber, UNDEFINED);
     }
 }

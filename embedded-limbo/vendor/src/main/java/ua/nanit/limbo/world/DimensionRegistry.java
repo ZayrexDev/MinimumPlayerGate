@@ -69,6 +69,98 @@ public final class DimensionRegistry {
     private CompoundBinaryTag tags_26_1;
     private CompoundBinaryTag tags_26_2;
 
+    @Nullable
+    private static <T> T findDefaultDimension(@NonNull CompoundBinaryTag codec,
+                                              @NonNull BiFunction<Integer, CompoundBinaryTag, T> function) {
+        ListBinaryTag dimensions;
+        BinaryTag binaryDimensionType = codec.get("minecraft:dimension_type");
+        if (binaryDimensionType instanceof CompoundBinaryTag tag) {
+            dimensions = tag.getList("value");
+        } else {
+            dimensions = codec.getList("dimension");
+        }
+
+        for (int i = 0; i < dimensions.size(); i++) {
+            BinaryTag dimension = dimensions.get(i);
+
+            CompoundBinaryTag dimensionTag = (CompoundBinaryTag) dimension;
+
+            T result = function.apply(i, dimensionTag);
+            if (result != null) {
+                return result;
+            }
+        }
+
+        CompoundBinaryTag defaultDimension = (CompoundBinaryTag) dimensions.get(0);
+        return function.apply(0, defaultDimension);
+    }
+
+    @NonNull
+    private static List<MetadataWriter> createRegistries(@NonNull CompoundBinaryTag tags) {
+        List<MetadataWriter> cachedRegistriesData = new ArrayList<>();
+        for (Map.Entry<String, ? extends BinaryTag> entry : tags) {
+            String registryType = entry.getKey();
+            CompoundBinaryTag compoundRegistryType = (CompoundBinaryTag) entry.getValue();
+
+            ListBinaryTag values = compoundRegistryType.getList("value");
+
+            cachedRegistriesData.add(createMetadataCodec(
+                    registryType,
+                    values
+            ));
+        }
+
+        return cachedRegistriesData;
+    }
+
+    @NonNull
+    private static MetadataWriter createMetadataCodec(@NonNull String registryType,
+                                                      @NonNull ListBinaryTag values) {
+        return (msg, version) -> {
+            msg.writeString(registryType);
+
+            msg.writeVarInt(values.size());
+            for (BinaryTag entry : values) {
+                CompoundBinaryTag entryTag = (CompoundBinaryTag) entry;
+
+                String name = entryTag.getString("name");
+                BinaryTag element = entryTag.get("element");
+
+                msg.writeString(name);
+                if (element instanceof CompoundBinaryTag elementTag) {
+                    msg.writeBoolean(true);
+                    msg.writeCompoundTag(elementTag, version);
+                } else {
+                    msg.writeBoolean(false);
+                }
+            }
+        };
+    }
+
+    @NonNull
+    private static Map<String, Map<String, List<Integer>>> parseUpdateTags(@NonNull CompoundBinaryTag tags) {
+        Map<String, Map<String, List<Integer>>> tagsMap = new HashMap<>();
+
+        for (Map.Entry<String, ? extends BinaryTag> namedTag : tags) {
+            Map<String, List<Integer>> subTagsMap = new HashMap<>();
+
+            CompoundBinaryTag subTag = (CompoundBinaryTag) namedTag.getValue();
+            for (Map.Entry<String, ? extends BinaryTag> subNamedTag : subTag) {
+                List<Integer> idsList = new ArrayList<>();
+                ListBinaryTag ids = (ListBinaryTag) subNamedTag.getValue();
+                for (BinaryTag id : ids) {
+                    idsList.add(((IntBinaryTag) id).value());
+                }
+
+                subTagsMap.put(subNamedTag.getKey(), idsList);
+            }
+
+            tagsMap.put(namedTag.getKey(), subTagsMap);
+        }
+
+        return tagsMap;
+    }
+
     public void load() throws IOException {
         codec_1_16 = readCompoundBinaryTag("dimension/codec_1_16.nbt");
         codec_1_16_2 = readCompoundBinaryTag("dimension/codec_1_16_2.nbt");
@@ -191,32 +283,6 @@ public final class DimensionRegistry {
         return findDefaultDimension(codec, findLegacyDimension);
     }
 
-    @Nullable
-    private static <T> T findDefaultDimension(@NonNull CompoundBinaryTag codec,
-                                              @NonNull BiFunction<Integer, CompoundBinaryTag, T> function) {
-        ListBinaryTag dimensions;
-        BinaryTag binaryDimensionType = codec.get("minecraft:dimension_type");
-        if (binaryDimensionType instanceof CompoundBinaryTag tag) {
-            dimensions = tag.getList("value");
-        } else {
-            dimensions = codec.getList("dimension");
-        }
-
-        for (int i = 0; i < dimensions.size(); i++) {
-            BinaryTag dimension = dimensions.get(i);
-
-            CompoundBinaryTag dimensionTag = (CompoundBinaryTag) dimension;
-
-            T result = function.apply(i, dimensionTag);
-            if (result != null) {
-                return result;
-            }
-        }
-
-        CompoundBinaryTag defaultDimension = (CompoundBinaryTag) dimensions.get(0);
-        return function.apply(0, defaultDimension);
-    }
-
     @NonNull
     public Map<Version, List<MetadataWriter>> createPerVersionRegistries() {
         Map<Version, List<MetadataWriter>> perVersionRegistry = new EnumMap<>(Version.class);
@@ -229,48 +295,6 @@ public final class DimensionRegistry {
         }
 
         return perVersionRegistry;
-    }
-
-    @NonNull
-    private static List<MetadataWriter> createRegistries(@NonNull CompoundBinaryTag tags) {
-        List<MetadataWriter> cachedRegistriesData = new ArrayList<>();
-        for (Map.Entry<String, ? extends BinaryTag> entry : tags) {
-            String registryType = entry.getKey();
-            CompoundBinaryTag compoundRegistryType = (CompoundBinaryTag) entry.getValue();
-
-            ListBinaryTag values = compoundRegistryType.getList("value");
-
-            cachedRegistriesData.add(createMetadataCodec(
-                    registryType,
-                    values
-            ));
-        }
-
-        return cachedRegistriesData;
-    }
-
-    @NonNull
-    private static MetadataWriter createMetadataCodec(@NonNull String registryType,
-                                                      @NonNull ListBinaryTag values) {
-        return (msg, version) -> {
-            msg.writeString(registryType);
-
-            msg.writeVarInt(values.size());
-            for (BinaryTag entry : values) {
-                CompoundBinaryTag entryTag = (CompoundBinaryTag) entry;
-
-                String name = entryTag.getString("name");
-                BinaryTag element = entryTag.get("element");
-
-                msg.writeString(name);
-                if (element instanceof CompoundBinaryTag elementTag) {
-                    msg.writeBoolean(true);
-                    msg.writeCompoundTag(elementTag, version);
-                } else {
-                    msg.writeBoolean(false);
-                }
-            }
-        };
     }
 
     @NonNull
@@ -298,29 +322,5 @@ public final class DimensionRegistry {
         } else {
             return parseUpdateTags(this.tags_1_20_5);
         }
-    }
-
-    @NonNull
-    private static Map<String, Map<String, List<Integer>>> parseUpdateTags(@NonNull CompoundBinaryTag tags) {
-        Map<String, Map<String, List<Integer>>> tagsMap = new HashMap<>();
-
-        for (Map.Entry<String, ? extends BinaryTag> namedTag : tags) {
-            Map<String, List<Integer>> subTagsMap = new HashMap<>();
-
-            CompoundBinaryTag subTag = (CompoundBinaryTag) namedTag.getValue();
-            for (Map.Entry<String, ? extends BinaryTag> subNamedTag : subTag) {
-                List<Integer> idsList = new ArrayList<>();
-                ListBinaryTag ids = (ListBinaryTag) subNamedTag.getValue();
-                for (BinaryTag id : ids) {
-                    idsList.add(((IntBinaryTag) id).value());
-                }
-
-                subTagsMap.put(subNamedTag.getKey(), idsList);
-            }
-
-            tagsMap.put(namedTag.getKey(), subTagsMap);
-        }
-
-        return tagsMap;
     }
 }
